@@ -55,3 +55,7 @@ claude --plugin-dir .
 ## Credits
 
 The pace rules follow [CodexBar](https://github.com/steipete/CodexBar) by Peter Steinberger
+
+## License
+
+MIT
