@@ -1,5 +1,7 @@
 export type SessionLimit = { kind: string; percentUsed: number; resetsAt?: string }
 
+export type SessionSlice = { name: string; tokens: number; kind: 'used' | 'free' | 'buffer' }
+
 export type SessionView = {
   tokens: number
   percent: number
@@ -7,6 +9,8 @@ export type SessionView = {
   effort: string
   folder: string
   branch: string
+  slices: SessionSlice[]
+  window: number
   limits: SessionLimit[]
   now: number
 }
