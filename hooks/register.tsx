@@ -129,8 +129,8 @@ const sync = async ($: EngineInterface, effort: string) => {
     $.process.run(['git', 'branch', '--show-current']).catch(() => null),
   ])
   await update($, view, () => ({
-    tokens: usage.context.tokens ?? 0,
-    percent: usage.context.percent ?? 0,
+    tokens: usage.context.tokens ?? usage.context.breakdown?.totalTokens ?? 0,
+    percent: usage.context.percent ?? usage.context.breakdown?.percentage ?? 0,
     model,
     effort,
     folder: home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd,
@@ -211,9 +211,11 @@ export const register: Register = on => {
     ]
 
     const parts = now.window > 0 ? stack(now.slices, now.window) : []
+    const lines = 2 + now.limits.filter(limit => NAME[limit.kind]).length
+    const space = e.props.maxRows >= lines * 2 ? 1 : 0
 
     return (
-      <Box flexDirection="column" gap={1} paddingLeft={2}>
+      <Box flexDirection="column" gap={space} paddingTop={space} paddingLeft={2}>
         <Text wrap="truncate-end">
           <Text>{now.model}</Text>
           {now.effort !== '' && dot}

@@ -44,6 +44,8 @@ Answer `y` to add the marketplace, then pick the user scope
 
 - Mods are an early access feature of Claude Code, so the API this uses may change between releases. Written against Claude Code 2.1.296
 - The effort level appears after the first prompt of a session
+- Until the first response of a session, or after a compaction, the context count is the same estimate `/context` shows
+- The blank rows above and between the lines are dropped when the prompt grows and leaves the band too few rows
 - Limits only show on a Claude subscription
 
 ## Development
