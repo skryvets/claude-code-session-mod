@@ -33,7 +33,7 @@ Bars are green, then yellow, then red: context turns yellow at 70% and red at 90
 Type this at the prompt of a Claude Code terminal session:
 
 ```
-/plugin install session --marketplace skryvets/claude-code-session-mod
+/plugin install session --marketplace skryvets/claude-status-bar-mod
 ```
 
 Answer `y` to add the marketplace, then pick the user scope
