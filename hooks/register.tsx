@@ -1,12 +1,26 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { SessionLimit, SessionView } from '../types'
+import type { SessionLimit, SessionSlice, SessionView } from '../types'
 
 const HOUR = 3600000
 const SPAN: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 168 * HOUR }
 const NAME: Record<string, string> = { five_hour: 'Session', seven_day: 'Weekly' }
 const BAR = 8
+const WIDE = 24
+const ORDER = { used: 0, free: 1, buffer: 2 }
+const GLYPH = { used: '█', free: '░', buffer: '▒' }
+const LABEL: Record<string, string> = {
+  'System prompt': 'system',
+  'System tools': 'tools',
+  'MCP tools': 'mcp',
+  'Memory files': 'memory',
+  'Custom agents': 'agents',
+  Messages: 'msgs',
+  'Autocompact buffer': 'buffer',
+}
+// Palette follows context-bar by Hamza Zafar (github.com/hamzafer/claude-code-mods): /context's theme gives several rows the same grey
+const PALETTE = ['#7aa2f7', '#7dcfff', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#73daca', '#c0caf5']
 const EMPTY: SessionView = {
   tokens: 0,
   percent: 0,
@@ -14,6 +28,8 @@ const EMPTY: SessionView = {
   effort: '',
   folder: '',
   branch: '',
+  slices: [],
+  window: 0,
   limits: [],
   now: 0,
 }
@@ -37,6 +53,40 @@ const heat = (percent: number) =>
   percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'success'
 
 const cells = (percent: number) => Math.min(BAR, Math.max(0, Math.round((percent / 100) * BAR)))
+
+const stack = (slices: SessionSlice[], window: number) => {
+  const sizes = slices.map(slice =>
+    slice.kind === 'free'
+      ? 0
+      : Math.max(slice.kind === 'used' ? 1 : 0, Math.round((slice.tokens / window) * WIDE)),
+  )
+  const free = slices.findIndex(slice => slice.kind === 'free')
+  let spare = WIDE - sizes.reduce((sum, size) => sum + size, 0)
+
+  if (spare > 0 && free >= 0) {
+    sizes[free] = spare
+    spare = 0
+  }
+
+  while (spare !== 0) {
+    sizes[sizes.indexOf(Math.max(...sizes))]! += Math.sign(spare)
+    spare -= Math.sign(spare)
+  }
+
+  let next = 0
+
+  return slices.map((slice, i) => ({
+    ...slice,
+    label: LABEL[slice.name] ?? slice.name.toLowerCase(),
+    size: sizes[i]!,
+    color:
+      slice.kind !== 'used'
+        ? 'inactive'
+        : slice.name === 'Messages'
+          ? 'claude'
+          : PALETTE[next++ % PALETTE.length]!,
+  }))
+}
 
 const untilReset = (limit: SessionLimit, now: number) =>
   limit.resetsAt ? Date.parse(limit.resetsAt) - now : 0
@@ -73,7 +123,7 @@ const sync = async ($: EngineInterface, effort: string) => {
     $.session.cwd(),
     $.env.get('HOME'),
     $.session.model(),
-    $.session.usage(),
+    $.session.usage({ breakdown: 'summary' }),
     $.clock.now(),
     $.process.run(['git', 'branch', '--show-current']).catch(() => null),
   ])
@@ -84,6 +134,12 @@ const sync = async ($: EngineInterface, effort: string) => {
     effort,
     folder: home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd,
     branch: git?.exitCode === 0 ? git.stdout.trim() : '',
+    slices: (usage.context.breakdown?.categories ?? [])
+      .flatMap(({ name, tokens, kind }) =>
+        kind === 'deferred' || tokens <= 0 ? [] : [{ name, tokens, kind }],
+      )
+      .sort((a, b) => ORDER[a.kind] - ORDER[b.kind]),
+    window: usage.context.breakdown?.rawMaxTokens ?? 0,
     limits: usage.rateLimits.map(({ kind, percentUsed, resetsAt }) =>
       resetsAt ? { kind, percentUsed, resetsAt } : { kind, percentUsed },
     ),
@@ -152,6 +208,8 @@ export const register: Register = on => {
       <Text color="inactive">{'░'.repeat(BAR - cells(percent))}</Text>,
     ]
 
+    const parts = now.window > 0 ? stack(now.slices, now.window) : []
+
     return (
       <Box flexDirection="column" gap={1} marginTop={1}>
         <Text wrap="truncate-end">
@@ -163,9 +221,26 @@ export const register: Register = on => {
           {now.branch !== '' && <Text color="suggestion">{` (${now.branch})`}</Text>}
         </Text>
         <Text wrap="truncate-end">
-          {row('Context', now.percent, heat(now.percent))}
+          {parts.length === 0
+            ? row('Context', now.percent, heat(now.percent))
+            : [
+                <Text bold>{'Context: '}</Text>,
+                ...parts.map(part => (
+                  <Text color={part.color}>{GLYPH[part.kind].repeat(part.size)}</Text>
+                )),
+              ]}
           <Text bold color={heat(now.percent)}>{` ${short(now.tokens)}`}</Text>
           <Text>{` (${now.percent}%)`}</Text>
+          {/* TODO: confirm the legend is wanted - it is the only added text and is the first thing cut on a narrow terminal */}
+          {parts
+            .filter(part => part.kind !== 'free')
+            .sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || b.tokens - a.tokens)
+            .map(part => (
+              <Text>
+                <Text color={part.color}>{` ${part.kind === 'used' ? '■' : GLYPH[part.kind]}`}</Text>
+                <Text dimColor>{part.label}</Text>
+              </Text>
+            ))}
         </Text>
         {now.limits.flatMap(limit => {
           const name = NAME[limit.kind]
