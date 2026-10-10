@@ -7,7 +7,7 @@ const HINT = {
   props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
 } as const
 
-const session = (on: On, rateLimits: SessionRateLimit[]) => {
+const session = (on: On, rateLimits: SessionRateLimit[], tokens = () => 46100) => {
   mock.clock(on, { now: Date.parse('2026-10-10T10:00:00Z') })
   mock.env(on, { HOME: '/Users/me' })
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
@@ -24,7 +24,7 @@ const session = (on: On, rateLimits: SessionRateLimit[]) => {
   on('session.usage', () => ({
     value: {
       startedAt: 0,
-      context: { tokens: 46100, window: 200000, percent: 23 },
+      context: { tokens: tokens(), window: 200000, percent: 23 },
       rateLimits,
     },
   }))
@@ -98,4 +98,20 @@ test('on pace can still forecast running out, as CodexBar does', async ($, on) =
   expect(texts).toContain('on pace')
   expect(texts).toContain('runs out in 4d 22h')
   expect(texts).toContain('resets in 5d 4h')
+})
+
+test('context is read again after a compaction', async ($, on) => {
+  let tokens = 201800
+
+  session(on, [], () => tokens)
+  on('session.compact', (_, e) => ({ messages: [...e.messages] }))
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+  tokens = 51600
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'hi', toolUses: [] }] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...HINT })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text).join('|')
+
+  expect(texts).toContain('51.6K')
+  expect(texts).not.toContain('201.8K')
 })
