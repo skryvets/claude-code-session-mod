@@ -6,14 +6,14 @@ import type { SessionLimit, SessionSlice, SessionView } from '../types'
 const HOUR = 3600000
 const SPAN: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 168 * HOUR }
 const NAME: Record<string, string> = { five_hour: 'Session', seven_day: 'Weekly' }
-const BAR = 8
-const WIDE = 24
+const BAR = 24
 const ORDER = { used: 0, free: 1, buffer: 2 }
 const GLYPH = { used: '█', free: '░', buffer: '▒' }
 const LABEL: Record<string, string> = {
   'System prompt': 'system',
   'System tools': 'tools',
   'MCP tools': 'mcp',
+  'MCP server instructions': 'mcp info',
   'Memory files': 'memory',
   'Custom agents': 'agents',
   Messages: 'msgs',
@@ -52,16 +52,17 @@ const left = (ms: number) => {
 const heat = (percent: number) =>
   percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'success'
 
-const cells = (percent: number) => Math.min(BAR, Math.max(0, Math.round((percent / 100) * BAR)))
+const cells = (percent: number) =>
+  percent > 0 ? Math.min(BAR, Math.max(1, Math.round((percent / 100) * BAR))) : 0
 
 const stack = (slices: SessionSlice[], window: number) => {
   const sizes = slices.map(slice =>
     slice.kind === 'free'
       ? 0
-      : Math.max(slice.kind === 'used' ? 1 : 0, Math.round((slice.tokens / window) * WIDE)),
+      : Math.max(slice.kind === 'used' ? 1 : 0, Math.round((slice.tokens / window) * BAR)),
   )
   const free = slices.findIndex(slice => slice.kind === 'free')
-  let spare = WIDE - sizes.reduce((sum, size) => sum + size, 0)
+  let spare = BAR - sizes.reduce((sum, size) => sum + size, 0)
 
   if (spare > 0 && free >= 0) {
     sizes[free] = spare
@@ -192,12 +193,13 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
-    const hint = await next(e)
+  // Drawn above the prompt because the engine drops PromptHint while it shows a notice of its own ("paste again to expand")
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const rest = await next(e)
     const now = await read($, view)
 
-    if (now.model === '') {
-      return hint
+    if (e.props.hasSurvey || now.model === '') {
+      return rest
     }
 
     const { Box, Text } = $.ui.resolve(e)
@@ -211,7 +213,7 @@ export const register: Register = on => {
     const parts = now.window > 0 ? stack(now.slices, now.window) : []
 
     return (
-      <Box flexDirection="column" gap={1} marginTop={1}>
+      <Box flexDirection="column" gap={1} paddingLeft={2}>
         <Text wrap="truncate-end">
           <Text>{now.model}</Text>
           {now.effort !== '' && dot}
@@ -235,10 +237,11 @@ export const register: Register = on => {
           {parts
             .filter(part => part.kind !== 'free')
             .sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || b.tokens - a.tokens)
-            .map(part => (
+            .map((part, i) => (
               <Text>
-                <Text color={part.color}>{` ${part.kind === 'used' ? '■' : GLYPH[part.kind]}`}</Text>
-                <Text dimColor>{part.label}</Text>
+                {i === 0 ? dot : '  '}
+                <Text color={part.color}>{part.kind === 'used' ? '■' : GLYPH[part.kind]}</Text>
+                <Text dimColor>{` ${part.label}`}</Text>
               </Text>
             ))}
         </Text>
@@ -263,7 +266,7 @@ export const register: Register = on => {
             </Text>,
           ]
         })}
-        {hint}
+        {rest}
       </Box>
     )
   })
