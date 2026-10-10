@@ -96,10 +96,7 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     await sync($, effort)
-    $.clock.every(60000, async () => {
-      const now = await $.clock.now()
-      await update($, view, old => ({ ...old, now }))
-    })
+    $.clock.every(60000, () => sync($, effort))
 
     return next(e)
   })
@@ -108,6 +105,16 @@ export const register: Register = on => {
     await sync($, effort)
 
     return next(e)
+  })
+
+  on('session.compact', async ($, e, next) => {
+    const result = await next(e)
+
+    if (e.agentId === undefined) {
+      await sync($, effort).catch(() => {})
+    }
+
+    return result
   })
 
   on('turn.step', async function* ($, e, next) {
