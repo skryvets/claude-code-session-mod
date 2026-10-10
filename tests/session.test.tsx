@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { On, SessionRateLimit } from 'claude-code'
+import type { ContextCategory, On, SessionRateLimit } from 'claude-code'
 
 const HINT = {
   component: 'PromptHint',
@@ -7,7 +7,12 @@ const HINT = {
   props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
 } as const
 
-const session = (on: On, rateLimits: SessionRateLimit[], tokens = () => 46100) => {
+const session = (
+  on: On,
+  rateLimits: SessionRateLimit[],
+  tokens = () => 46100,
+  categories?: ContextCategory[],
+) => {
   mock.clock(on, { now: Date.parse('2026-10-10T10:00:00Z') })
   mock.env(on, { HOME: '/Users/me' })
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
@@ -24,7 +29,28 @@ const session = (on: On, rateLimits: SessionRateLimit[], tokens = () => 46100) =
   on('session.usage', () => ({
     value: {
       startedAt: 0,
-      context: { tokens: tokens(), window: 200000, percent: 23 },
+      context: {
+        tokens: tokens(),
+        window: 200000,
+        percent: 23,
+        ...(categories && {
+          breakdown: {
+            categories,
+            totalTokens: tokens(),
+            maxTokens: 200000,
+            rawMaxTokens: 200000,
+            autocompactSource: 'model-default',
+            percentage: 23,
+            gridRows: [],
+            model: 'opus',
+            memoryFiles: [],
+            mcpTools: [],
+            agents: [],
+            isAutoCompactEnabled: true,
+            apiUsage: null,
+          },
+        }),
+      },
       rateLimits,
     },
   }))
@@ -114,4 +140,32 @@ test('context is read again after a compaction', async ($, on) => {
 
   expect(texts).toContain('51.6K')
   expect(texts).not.toContain('201.8K')
+})
+
+test('context is drawn as one bar stacked by what fills the window', async ($, on) => {
+  const row = (name: string, tokens: number, kind: ContextCategory['kind'] = 'used') => ({
+    name,
+    tokens,
+    kind,
+    color: 'inactive',
+    isDeferred: kind === 'deferred',
+  })
+
+  session(on, [], () => 46100, [
+    row('System prompt', 3000),
+    row('System tools', 16000),
+    row('MCP tools (deferred)', 40000, 'deferred'),
+    row('Skills', 0),
+    row('Messages', 27100),
+    row('Autocompact buffer', 33000, 'buffer'),
+    row('Free space', 120900, 'free'),
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...HINT })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+
+  expect(texts).toContain(`Context: █${'██'}${'███'}${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) ■msgs ■tools ■system ▒buffer`)
+  expect(texts.join('|')).not.toContain('deferred')
+  expect(texts.join('|')).not.toContain('skills')
 })
