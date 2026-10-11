@@ -177,6 +177,13 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // /clear and resume go on under a new session with empty state, and no session.start fires for them
+  on('classic.SessionStart', async ($, e, next) => {
+    await sync($, effort).catch(() => {})
+
+    return next(e)
+  })
+
   on('session.measure', async ($, e, next) => {
     await sync($, effort)
 

@@ -301,3 +301,15 @@ test('the band is left to a survey', async ($, on) => {
 
   expect(texts).toEqual(['band below'])
 })
+
+test('the band is drawn again after a /clear', async ($, on) => {
+  session(on, [])
+  on('classic.SessionStart', () => ({}))
+  await $.classic.SessionStart({ source: 'clear' })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text).join('|')
+
+  expect(texts).toContain('Opus 5.5')
+  expect(texts).toContain('46.1K')
+})
