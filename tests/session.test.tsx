@@ -260,6 +260,19 @@ test('a category takes its true share of the bar, down to no cell at all', async
   expect(filled.filter(found => found.text === '█').every(found => found.props.color === 'claude')).toBe(true)
 })
 
+test('a lone small category still fills one whole cell', async ($, on) => {
+  session(on, [], () => 500, [
+    { name: 'System prompt', tokens: 500, kind: 'used', color: 'inactive', isDeferred: false },
+    { name: 'Free space', tokens: 199500, kind: 'free', color: 'inactive', isDeferred: false },
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+
+  expect(texts).toContain(`Context: █${'░'.repeat(23)} 500 (23%) · ■ system`)
+})
+
 test('a limit with any usage fills at least one cell', async ($, on) => {
   session(on, [
     { kind: 'five_hour', percentUsed: 0, resetsAt: '2026-10-10T11:22:00Z' },

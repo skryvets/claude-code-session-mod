@@ -81,11 +81,13 @@ const stack = (slices: SessionSlice[], window: number) => {
   // Whole cells in total: a half cell next to the free space leaves a gap in the terminal's background colour
   const filled = 2 * Math.max(used.length > 0 ? 1 : 0, Math.round(sum(quotas) / 2))
 
-  quotas
+  const order = quotas
     .map((quota, i) => [quota - sizes[i]!, i] as const)
     .sort((a, b) => b[0] - a[0])
-    .slice(0, filled - sum(sizes))
-    .forEach(([, i]) => sizes[i]!++)
+
+  for (let turn = 0; sum(sizes) < filled; turn++) {
+    sizes[order[turn % order.length]![1]]!++
+  }
 
   const buffer = Math.min(BAR * 2 - filled, 2 * Math.round((tokens('buffer') * scale) / 2))
   const halves = [
