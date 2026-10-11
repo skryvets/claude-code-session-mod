@@ -55,31 +55,15 @@ const heat = (percent: number) =>
 const cells = (percent: number) =>
   percent > 0 ? Math.min(BAR, Math.max(1, Math.round((percent / 100) * BAR))) : 0
 
+const FREE = { kind: 'free', color: 'inactive' } as const
+const BUFFER = { kind: 'buffer', color: 'inactive' } as const
+
+// Sized in half cells: ▌ takes one colour as foreground and the next as background, so a cell holds two categories
 const stack = (slices: SessionSlice[], window: number) => {
-  const sizes = slices.map(slice =>
-    slice.kind === 'free'
-      ? 0
-      : Math.max(slice.kind === 'used' ? 1 : 0, Math.round((slice.tokens / window) * BAR)),
-  )
-  const free = slices.findIndex(slice => slice.kind === 'free')
-  let spare = BAR - sizes.reduce((sum, size) => sum + size, 0)
-
-  if (spare > 0 && free >= 0) {
-    sizes[free] = spare
-    spare = 0
-  }
-
-  while (spare !== 0) {
-    sizes[sizes.indexOf(Math.max(...sizes))]! += Math.sign(spare)
-    spare -= Math.sign(spare)
-  }
-
   let next = 0
-
-  return slices.map((slice, i) => ({
+  const parts = slices.map(slice => ({
     ...slice,
     label: LABEL[slice.name] ?? slice.name.toLowerCase(),
-    size: sizes[i]!,
     color:
       slice.kind !== 'used'
         ? 'inactive'
@@ -87,6 +71,41 @@ const stack = (slices: SessionSlice[], window: number) => {
           ? 'claude'
           : PALETTE[next++ % PALETTE.length]!,
   }))
+  const used = parts.filter(part => part.kind === 'used')
+  const sum = (list: number[]) => list.reduce((total, n) => total + n, 0)
+  const tokens = (kind: SessionSlice['kind']) =>
+    sum(slices.filter(slice => slice.kind === kind).map(slice => slice.tokens))
+  const scale = (BAR * 2) / Math.max(window, tokens('used'))
+  const quotas = used.map(part => part.tokens * scale)
+  const sizes = quotas.map(Math.floor)
+  // Whole cells in total: a half cell next to the free space leaves a gap in the terminal's background colour
+  const filled = 2 * Math.max(used.length > 0 ? 1 : 0, Math.round(sum(quotas) / 2))
+
+  const order = quotas
+    .map((quota, i) => [quota - sizes[i]!, i] as const)
+    .sort((a, b) => b[0] - a[0])
+
+  for (let turn = 0; sum(sizes) < filled; turn++) {
+    sizes[order[turn % order.length]![1]]!++
+  }
+
+  const buffer = Math.min(BAR * 2 - filled, 2 * Math.round((tokens('buffer') * scale) / 2))
+  const halves = [
+    ...used.flatMap((part, i) => Array<(typeof used)[number]>(sizes[i]!).fill(part)),
+    ...Array<typeof FREE>(BAR * 2 - filled - buffer).fill(FREE),
+    ...Array<typeof BUFFER>(buffer).fill(BUFFER),
+  ]
+
+  return {
+    parts,
+    cells: Array.from({ length: BAR }, (_, i) => {
+      const [a, b] = [halves[i * 2]!, halves[i * 2 + 1]!]
+
+      return a === b || a.kind !== 'used'
+        ? { glyph: GLYPH[a.kind], color: a.color }
+        : { glyph: '▌', color: a.color, ...(b.kind === 'used' && { backgroundColor: b.color }) }
+    }),
+  }
 }
 
 const untilReset = (limit: SessionLimit, now: number) =>
@@ -129,8 +148,8 @@ const sync = async ($: EngineInterface, effort: string) => {
     $.process.run(['git', 'branch', '--show-current']).catch(() => null),
   ])
   await update($, view, () => ({
-    tokens: usage.context.tokens ?? 0,
-    percent: usage.context.percent ?? 0,
+    tokens: usage.context.tokens ?? usage.context.breakdown?.totalTokens ?? 0,
+    percent: usage.context.percent ?? usage.context.breakdown?.percentage ?? 0,
     model,
     effort,
     folder: home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd,
@@ -210,10 +229,13 @@ export const register: Register = on => {
       <Text color="inactive">{'░'.repeat(BAR - cells(percent))}</Text>,
     ]
 
-    const parts = now.window > 0 ? stack(now.slices, now.window) : []
+    const { parts, cells: bar } =
+      now.window > 0 ? stack(now.slices, now.window) : { parts: [], cells: [] }
+    const lines = 2 + now.limits.filter(limit => NAME[limit.kind]).length
+    const space = e.props.maxRows >= lines * 2 ? 1 : 0
 
     return (
-      <Box flexDirection="column" gap={1} paddingLeft={2}>
+      <Box flexDirection="column" gap={space} paddingTop={space} paddingLeft={2}>
         <Text wrap="truncate-end">
           <Text>{now.model}</Text>
           {now.effort !== '' && dot}
@@ -227,9 +249,7 @@ export const register: Register = on => {
             ? row('Context', now.percent, heat(now.percent))
             : [
                 <Text bold>{'Context: '}</Text>,
-                ...parts.map(part => (
-                  <Text color={part.color}>{GLYPH[part.kind].repeat(part.size)}</Text>
-                )),
+                ...bar.map(({ glyph, ...colors }) => <Text {...colors}>{glyph}</Text>),
               ]}
           <Text bold color={heat(now.percent)}>{` ${short(now.tokens)}`}</Text>
           <Text>{` (${now.percent}%)`}</Text>

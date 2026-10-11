@@ -17,9 +17,14 @@ const BAND = {
 const session = (
   on: On,
   rateLimits: SessionRateLimit[],
-  tokens = () => 46100,
+  tokens: () => number | undefined = () => 46100,
   categories?: ContextCategory[],
 ) => {
+  const estimate = (categories ?? []).reduce(
+    (sum, { tokens, kind }) => (kind === 'used' ? sum + tokens : sum),
+    0,
+  )
+
   mock.clock(on, { now: Date.parse('2026-10-10T10:00:00Z') })
   mock.env(on, { HOME: '/Users/me' })
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
@@ -37,17 +42,16 @@ const session = (
     value: {
       startedAt: 0,
       context: {
-        tokens: tokens(),
+        ...(tokens() !== undefined && { tokens: tokens()!, percent: 23 }),
         window: 200000,
-        percent: 23,
         ...(categories && {
           breakdown: {
             categories,
-            totalTokens: tokens(),
+            totalTokens: estimate,
             maxTokens: 200000,
             rawMaxTokens: 200000,
             autocompactSource: 'model-default',
-            percentage: 23,
+            percentage: Math.round(estimate / 2000),
             gridRows: [],
             model: 'opus',
             memoryFiles: [],
@@ -172,9 +176,101 @@ test('context is drawn as one bar stacked by what fills the window', async ($, o
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts).toContain(`Context: █${'██'}${'███'}${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
+  expect(texts).toContain(`Context: ▌█▌███${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
+  const halves = (await ui.findAll({ type: 'Text', text: '▌' })).filter(found => found.text === '▌')
+
+  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#7dcfff', 'claude'])
   expect(texts.join('|')).not.toContain('deferred')
   expect(texts.join('|')).not.toContain('skills')
+})
+
+test('a fresh session shows the estimated context until the first response', async ($, on) => {
+  const row = (name: string, tokens: number, kind: ContextCategory['kind'] = 'used') => ({
+    name,
+    tokens,
+    kind,
+    color: 'inactive',
+    isDeferred: false,
+  })
+
+  session(on, [], () => undefined, [
+    row('System prompt', 4000),
+    row('System tools', 18000),
+    row('Skills', 0),
+    row('Messages', 0),
+    row('Autocompact buffer', 33000, 'buffer'),
+    row('Free space', 145000, 'free'),
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+
+  expect(texts).toContain(`Context: ▌██${'░'.repeat(17)}▒▒▒▒ 22.0K (11%) · ■ tools  ■ system  ▒ buffer`)
+})
+
+test('the band keeps a blank row above and between lines only while they fit', async ($, on) => {
+  session(on, [
+    { kind: 'five_hour', percentUsed: 66, resetsAt: '2026-10-10T11:22:00Z' },
+    { kind: 'seven_day', percentUsed: 60, resetsAt: '2026-10-14T10:00:00Z' },
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  for (const [maxRows, space] of [
+    [8, 1],
+    [7, 0],
+    [4, 0],
+  ] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'session',
+      surface: 'terminal',
+      ...BAND,
+      props: { ...BAND.props, maxRows },
+    })
+    const box = (await ui.findAll({ type: 'Box' }))[0]!
+
+    expect(box.props.gap).toBe(space)
+    expect(box.props.paddingTop).toBe(space)
+    await ui.unmount()
+  }
+})
+
+test('a category takes its true share of the bar, down to no cell at all', async ($, on) => {
+  const row = (name: string, tokens: number, kind: ContextCategory['kind'] = 'used') => ({
+    name,
+    tokens,
+    kind,
+    color: 'inactive',
+    isDeferred: false,
+  })
+
+  session(on, [], () => 30500, [
+    row('System prompt', 300),
+    row('Memory files', 200),
+    row('Messages', 30000),
+    row('Free space', 169500, 'free'),
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+  const filled = await ui.findAll({ type: 'Text', text: '█' })
+
+  expect(texts).toContain(`Context: ████${'░'.repeat(20)} 30.5K (23%) · ■ msgs  ■ system  ■ memory`)
+  expect(filled.filter(found => found.text === '█').every(found => found.props.color === 'claude')).toBe(true)
+})
+
+test('a lone small category still fills one whole cell', async ($, on) => {
+  session(on, [], () => 500, [
+    { name: 'System prompt', tokens: 500, kind: 'used', color: 'inactive', isDeferred: false },
+    { name: 'Free space', tokens: 199500, kind: 'free', color: 'inactive', isDeferred: false },
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+
+  expect(texts).toContain(`Context: █${'░'.repeat(23)} 500 (23%) · ■ system`)
 })
 
 test('a limit with any usage fills at least one cell', async ($, on) => {
