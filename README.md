@@ -26,7 +26,7 @@ Weekly:  ██████████░░░░░░░░░░░░░�
 - `lasts until reset` / `runs out in …` - a straight-line forecast from your spending so far
 - No pace is shown until 3% of the window has passed (9 minutes for Session, about 5 hours for Weekly)
 
-The context bar has one colour per category, named by the legend after it. Each category takes its true share of the window, to the nearest half cell: `▌` is a cell split between two categories, and a category too small for half a cell is named in the legend but not drawn. Messages are in the accent colour, `░` is free space and `▒` is the autocompact buffer, the reserve at the end of the window: auto-compaction runs when usage reaches it. The legend is the first thing cut on a narrow terminal
+The context bar has one colour per category, named by the legend after it. The filled part is true to size to the nearest cell, and each category takes its share of it to the nearest half cell: `▌` is a cell split between two categories, and a category too small for half a cell is named in the legend but not drawn. Messages are in the accent colour, `░` is free space and `▒` is the autocompact buffer, the reserve at the end of the window: auto-compaction runs when usage reaches it. The legend is the first thing cut on a narrow terminal
 
 The context token count is green, then yellow at 70% and red at 90%. Limit bars are green, yellow in deficit and red past 12 points of deficit
 

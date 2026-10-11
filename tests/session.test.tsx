@@ -176,10 +176,10 @@ test('context is drawn as one bar stacked by what fills the window', async ($, o
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts).toContain(`Context: ▌█▌██▌${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
+  expect(texts).toContain(`Context: ▌█▌███${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
   const halves = (await ui.findAll({ type: 'Text', text: '▌' })).filter(found => found.text === '▌')
 
-  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#7dcfff', 'claude', undefined])
+  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#7dcfff', 'claude'])
   expect(texts.join('|')).not.toContain('deferred')
   expect(texts.join('|')).not.toContain('skills')
 })
@@ -206,7 +206,7 @@ test('a fresh session shows the estimated context until the first response', asy
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts).toContain(`Context: ▌█▌${'░'.repeat(17)}▒▒▒▒ 22.0K (11%) · ■ tools  ■ system  ▒ buffer`)
+  expect(texts).toContain(`Context: ▌██${'░'.repeat(17)}▒▒▒▒ 22.0K (11%) · ■ tools  ■ system  ▒ buffer`)
 })
 
 test('the band keeps a blank row above and between lines only while they fit', async ($, on) => {
@@ -256,7 +256,7 @@ test('a category takes its true share of the bar, down to no cell at all', async
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
   const filled = await ui.findAll({ type: 'Text', text: '█' })
 
-  expect(texts).toContain(`Context: ███▌${'░'.repeat(20)} 30.5K (23%) · ■ msgs  ■ system  ■ memory`)
+  expect(texts).toContain(`Context: ████${'░'.repeat(20)} 30.5K (23%) · ■ msgs  ■ system  ■ memory`)
   expect(filled.filter(found => found.text === '█').every(found => found.props.color === 'claude')).toBe(true)
 })
 

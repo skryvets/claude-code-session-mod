@@ -78,7 +78,8 @@ const stack = (slices: SessionSlice[], window: number) => {
   const scale = (BAR * 2) / Math.max(window, tokens('used'))
   const quotas = used.map(part => part.tokens * scale)
   const sizes = quotas.map(Math.floor)
-  const filled = Math.max(used.length > 0 ? 1 : 0, Math.round(sum(quotas)))
+  // Whole cells in total: a half cell next to the free space leaves a gap in the terminal's background colour
+  const filled = 2 * Math.max(used.length > 0 ? 1 : 0, Math.round(sum(quotas) / 2))
 
   quotas
     .map((quota, i) => [quota - sizes[i]!, i] as const)
