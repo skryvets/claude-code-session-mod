@@ -285,7 +285,7 @@ test('the fill follows the time passed, whatever the usage', async ($, on) => {
   expect(texts.some(text => text.startsWith(`Weekly:  ┃${'█'.repeat(9)}${'░'.repeat(14)} 1% used`))).toBe(true)
 })
 
-test('the fill takes the elapsed colour and the marker the pace colour', async ($, on) => {
+test('the fill takes the elapsed colour and the marker its own', async ($, on) => {
   session(on, [
     { kind: 'five_hour', percentUsed: 66, resetsAt: '2026-10-10T11:22:00Z' },
     { kind: 'seven_day', percentUsed: 100, resetsAt: '2026-10-14T10:00:00Z' },
@@ -299,7 +299,7 @@ test('the fill takes the elapsed colour and the marker the pace colour', async (
       .filter(found => found.text === glyph)
       .map(found => found.props.color)
 
-  expect(await colors('┃')).toEqual(['success', 'error'])
+  expect(await colors('┃')).toEqual(['#333131', '#333131'])
   expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#999999'))
   expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}┃ 100% used`))).toBe(true)
 })

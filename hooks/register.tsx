@@ -22,6 +22,7 @@ const LABEL: Record<string, string> = {
 // Palette follows context-bar by Hamza Zafar (github.com/hamzafer/claude-code-mods): /context's theme gives several rows the same grey
 const PALETTE = ['#7aa2f7', '#7dcfff', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#73daca', '#c0caf5']
 const ELAPSED = '#999999'
+const MARK = '#333131'
 const EMPTY: SessionView = {
   tokens: 0,
   percent: 0,
@@ -294,7 +295,7 @@ export const register: Register = on => {
               <Text bold>{`${name}:`.padEnd(9)}</Text>
               {Array.from({ length: BAR }, (_, i) =>
                 i === mark ? (
-                  <Text color={at?.color}>┃</Text>
+                  <Text color={MARK}>┃</Text>
                 ) : i < filled ? (
                   <Text color={ELAPSED}>█</Text>
                 ) : (

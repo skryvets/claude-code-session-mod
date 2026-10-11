@@ -29,7 +29,7 @@ Weekly:  ██████████░┃░░░░░░░░░░░�
 
 The context bar has one colour per category, named by the legend after it. The filled part is true to size to the nearest cell, and each category takes its share of it to the nearest half cell: `▌` is a cell split between two categories, and a category too small for half a cell is named in the legend but not drawn. Messages are in the accent colour, `░` is free space and `▒` is the autocompact buffer, the reserve at the end of the window: auto-compaction runs when usage reaches it. The legend is the first thing cut on a narrow terminal
 
-The context token count is green, then yellow at 70% and red at 90%. Limit bars are filled in dark grey, with the marker in the pace colour. The pace text is green, yellow in deficit and red past 12 points of deficit
+The context token count is green, then yellow at 70% and red at 90%. Limit bars are filled in grey, with a darker grey marker. The pace text is green, yellow in deficit and red past 12 points of deficit
 
 ## Install
 
