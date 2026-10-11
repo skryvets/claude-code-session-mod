@@ -3,7 +3,7 @@
 A Claude Code mod that draws session info above the prompt, in colour
 
 ```
-claude-opus-5-5 · high · ~/Code/app (main)
+claude-opus-5-5 · high · ~/Code/app (add-login) ±3 ↑2 ↓1 · PR #12 open
 
 Context: ███████░░░░░░░░░░░░░▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer
 
@@ -15,8 +15,16 @@ Weekly:  ██████████░█░░░░░░░░░░░�
 ## What it shows
 
 - Model, effort level, folder and git branch
+- Git state after the branch: `±3` files changed and not committed, `↑2` commits to push, `↓1` commits to pull, and the branch's pull request as open, merged or closed
 - Context window: one bar stacked by what fills it (messages, tools, MCP, memory, skills, system prompt), the free space and the autocompact buffer, then tokens used and percent
 - Session (5 hour) and Weekly (7 day) subscription limits: a bar of the time passed with a marker at the usage, percent used, pace, forecast and time until reset
+
+## How to read the git state
+
+- `±N` - files with uncommitted changes, untracked files included
+- `↑N` - commits not pushed to the upstream branch. A bare `↑` is a branch that has no upstream yet
+- `↓N` - commits on the upstream branch to pull, as of the last `git fetch`: the bar does not fetch
+- `PR #N open` / `merged` / `closed` - the pull request of the current branch, read with the [GitHub CLI](https://cli.github.com) once a minute and at the end of each turn. Nothing is shown without `gh`, or when the branch has no pull request
 
 ## Show and hide
 

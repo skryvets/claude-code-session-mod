@@ -19,6 +19,7 @@ const session = (
   rateLimits: SessionRateLimit[],
   tokens: () => number | undefined = () => 46100,
   categories?: ContextCategory[],
+  host: () => Record<string, string> = () => ({ git: '# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n' }),
 ) => {
   const estimate = (categories ?? []).reduce(
     (sum, { tokens, kind }) => (kind === 'used' ? sum + tokens : sum),
@@ -30,10 +31,10 @@ const session = (
   mock.store(on)
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
   on('session.model', () => ({ value: 'Opus 5.5' }))
-  on('process.run', () => ({
+  on('process.run', (_, e) => ({
     value: {
-      exitCode: 0,
-      stdout: 'main\n',
+      exitCode: e.argv[0]! in host() ? 0 : 1,
+      stdout: host()[e.argv[0]!] ?? '',
       stderr: '',
       isStdoutTruncated: false,
       isStderrTruncated: false,
@@ -367,4 +368,67 @@ test('/status-bar-mod hides the band and shows it again, across a /clear', async
 
   expect((await toggle()).text).toBe('Status bar shown')
   expect((await drawn()).join('|')).toContain('Opus 5.5')
+})
+
+test('the branch is followed by changed files, commits to push and pull, and the pull request', async ($, on) => {
+  const status = (head: string, rest: string[]) => [`# branch.oid abc`, `# branch.head ${head}`, ...rest, ''].join('\n')
+  const pr = (state: string) => JSON.stringify({ number: 12, state, headRefName: 'feature' })
+  let host: Record<string, string> = {}
+
+  session(on, [], () => 46100, undefined, () => host)
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+
+  const drawn = async () => {
+    await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+    const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+    const found = await ui.findAll({ type: 'Text' })
+
+    await ui.unmount()
+
+    return found
+  }
+  const line = async () => (await drawn())[0]!.text
+  const turn = () => $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 'turn', reason: 'answer' })
+
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app')
+
+  host = { git: status('(detached)', ['1 .M N... 100644 100644 100644 abc abc a.ts']) }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app ±1')
+
+  host = { git: status('feature', []) }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ↑')
+
+  host = {
+    git: status('feature', [
+      '# branch.upstream origin/feature',
+      '# branch.ab +2 -3',
+      '1 .M N... 100644 100644 100644 abc abc a.ts',
+      '2 R. N... 100644 100644 100644 abc abc R100 b.ts\tc.ts',
+      'u UU N... 100644 100644 100644 100644 abc abc abc d.ts',
+      '? e.ts',
+    ]),
+    gh: pr('OPEN'),
+  }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ±4 ↑2 ↓3')
+
+  await turn()
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ±4 ↑2 ↓3 · PR #12 open')
+
+  const colors = Object.fromEntries((await drawn()).map(found => [found.text, found.props.color]))
+
+  expect(colors).toMatchObject({ ' ±4': 'warning', ' ↑2': 'success', ' ↓3': 'error', 'PR #12 open': 'success' })
+
+  host = { git: status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']), gh: pr('MERGED') }
+  await turn()
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) · PR #12 merged')
+  expect((await drawn()).find(found => found.text === 'PR #12 merged')!.props.color).toBe('merged')
+
+  host = { git: status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']), gh: pr('MERGED') }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (other)')
+
+  host = { git: status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']) }
+  await turn()
+  host = { git: status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']) }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature)')
 })
