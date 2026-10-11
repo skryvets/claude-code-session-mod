@@ -177,7 +177,7 @@ test('context is drawn as one bar stacked by what fills the window', async ($, o
   expect(texts).toContain(`Context: ▌█▌███${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
   const halves = (await ui.findAll({ type: 'Text', text: '▌' })).filter(found => found.text === '▌')
 
-  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#7dcfff', 'claude'])
+  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#565f89', 'claude'])
   expect(texts.join('|')).not.toContain('deferred')
   expect(texts.join('|')).not.toContain('skills')
 })
@@ -300,7 +300,7 @@ test('the fill takes the elapsed colour and the marker the pace colour', async (
       .map(found => found.props.color)
 
   expect(await colors('┃')).toEqual(['success', 'error'])
-  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#7dcfff'))
+  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#565f89'))
   expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}┃ 100% used`))).toBe(true)
 })
 
