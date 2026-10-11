@@ -261,10 +261,12 @@ export const register: Register = on => {
     const { parts, cells: bar } =
       now.window > 0 ? stack(now.slices, now.window) : { parts: [], cells: [] }
     const lines = 2 + now.limits.filter(limit => NAME[limit.kind]).length
-    const space = e.props.maxRows >= lines * 2 ? 1 : 0
+    // TODO: confirm the band should pack tight below this rather than keep its blank rows and scroll - the engine caps it at half the terminal, the prompt included
+    const gap = e.props.maxRows >= lines * 2 - 1 ? 1 : 0
+    const paddingTop = e.props.maxRows >= lines * 2 ? 1 : 0
 
     return (
-      <Box flexDirection="column" gap={space} paddingTop={space} paddingLeft={2}>
+      <Box flexDirection="column" gap={gap} paddingTop={paddingTop} paddingLeft={2}>
         <Text wrap="truncate-end">
           <Text>{now.model}</Text>
           {now.effort !== '' && dot}

@@ -208,17 +208,18 @@ test('a fresh session shows the estimated context until the first response', asy
   expect(texts).toContain(`Context: ▌██${'░'.repeat(17)}▒▒▒▒ 22.0K (11%) · ■ tools  ■ system  ▒ buffer`)
 })
 
-test('the band keeps a blank row above and between lines only while they fit', async ($, on) => {
+test('the band gives up the blank row above before the ones between lines', async ($, on) => {
   session(on, [
     { kind: 'five_hour', percentUsed: 66, resetsAt: '2026-10-10T11:22:00Z' },
     { kind: 'seven_day', percentUsed: 60, resetsAt: '2026-10-14T10:00:00Z' },
   ])
   await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
 
-  for (const [maxRows, space] of [
-    [8, 1],
-    [7, 0],
-    [4, 0],
+  for (const [maxRows, gap, paddingTop] of [
+    [8, 1, 1],
+    [7, 1, 0],
+    [6, 0, 0],
+    [4, 0, 0],
   ] as const) {
     const ui = await $.ui.mount({
       plugin: 'session',
@@ -228,8 +229,8 @@ test('the band keeps a blank row above and between lines only while they fit', a
     })
     const box = (await ui.findAll({ type: 'Box' }))[0]!
 
-    expect(box.props.gap).toBe(space)
-    expect(box.props.paddingTop).toBe(space)
+    expect(box.props.gap).toBe(gap)
+    expect(box.props.paddingTop).toBe(paddingTop)
     await ui.unmount()
   }
 })
