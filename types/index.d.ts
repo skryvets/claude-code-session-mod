@@ -14,7 +14,7 @@ export type SessionView = {
   changed: number
   ahead: number
   behind: number
-  isPublished: boolean
+  isUnpublished: boolean
   pull: SessionPull | null
   slices: SessionSlice[]
   window: number

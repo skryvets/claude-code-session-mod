@@ -34,7 +34,7 @@ const EMPTY: SessionView = {
   changed: 0,
   ahead: 0,
   behind: 0,
-  isPublished: false,
+  isUnpublished: false,
   pull: null,
   slices: [],
   window: 0,
@@ -156,7 +156,7 @@ const pace = (limit: SessionLimit, now: number) => {
 const PULL: Record<string, string> = { OPEN: 'success', MERGED: 'merged', CLOSED: 'error' }
 
 // Reads `git status --porcelain=v2 --branch` (git-scm.com/docs/git-status#_porcelain_format_version_2)
-const repo = (status: string) => {
+const repo = (status: string, hasRemote: boolean) => {
   const lines = status.split('\n').filter(line => line !== '')
   const header = (name: string) =>
     lines.find(line => line.startsWith(`# branch.${name} `))?.slice(`# branch.${name} `.length)
@@ -168,15 +168,21 @@ const repo = (status: string) => {
     changed: lines.filter(line => !line.startsWith('#')).length,
     ahead,
     behind,
-    isPublished: header('upstream') !== undefined,
+    isUnpublished: hasRemote && head !== '' && head !== '(detached)' && header('upstream') === undefined,
   }
 }
 
-// Kept out of sync: gh asks GitHub, too slow for every measure
-const review = async ($: EngineInterface) => {
-  const gh = await $.process
-    .run(['gh', 'pr', 'view', '--json', 'number,state,headRefName'], { timeoutMs: 5000 })
-    .catch(() => null)
+// Kept out of sync: both ask the network, too slow for every measure
+const review = async ($: EngineInterface, effort: string) => {
+  const [gh] = await Promise.all([
+    $.process
+      .run(['gh', 'pr', 'view', '--json', 'number,state,headRefName'], { timeoutMs: 5000 })
+      .catch(() => null),
+    // No prompt can be answered here, so a remote that asks for a password fails at once
+    $.process
+      .run(['git', 'fetch', '--quiet'], { timeoutMs: 10000, env: { GIT_TERMINAL_PROMPT: '0' } })
+      .catch(() => null),
+  ])
   let pull: SessionPull | null = null
 
   try {
@@ -186,16 +192,18 @@ const review = async ($: EngineInterface) => {
   } catch {}
 
   await update($, view, now => ({ ...now, pull }))
+  await sync($, effort)
 }
 
 const sync = async ($: EngineInterface, effort: string) => {
-  const [cwd, home, model, usage, now, git, hidden] = await Promise.all([
+  const [cwd, home, model, usage, now, git, remote, hidden] = await Promise.all([
     $.session.cwd(),
     $.env.get('HOME'),
     $.session.model(),
     $.session.usage({ breakdown: 'summary' }),
     $.clock.now(),
     $.process.run(['git', 'status', '--porcelain=v2', '--branch']).catch(() => null),
+    $.process.run(['git', 'remote']).catch(() => null),
     $.store.get('hidden'),
   ])
   await update($, view, ({ pull }) => ({
@@ -204,7 +212,7 @@ const sync = async ($: EngineInterface, effort: string) => {
     model,
     effort,
     folder: home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd,
-    ...repo(git?.exitCode === 0 ? git.stdout : ''),
+    ...repo(git?.exitCode === 0 ? git.stdout : '', remote?.exitCode === 0 && remote.stdout.trim() !== ''),
     pull,
     slices: (usage.context.breakdown?.categories ?? [])
       .flatMap(({ name, tokens, kind }) =>
@@ -226,10 +234,10 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: COMMAND, description: 'Show or hide the status bar' })
     await sync($, effort)
-    await review($)
+    await review($, effort)
     $.clock.every(60000, async () => {
       await sync($, effort)
-      await review($)
+      await review($, effort)
     })
 
     return next(e)
@@ -238,7 +246,7 @@ export const register: Register = on => {
   // /clear and resume go on under a new session with empty state, and no session.start fires for them
   on('classic.SessionStart', async ($, e, next) => {
     await sync($, effort).catch(() => {})
-    await review($).catch(() => {})
+    await review($, effort).catch(() => {})
 
     return next(e)
   })
@@ -282,8 +290,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       await sync($, effort)
-      // TODO: confirm asking GitHub at the end of every turn is wanted - it is where a PR opened by the turn shows up, at the cost of one gh call
-      await review($)
+      await review($, effort)
     }
 
     return next(e)
@@ -323,11 +330,9 @@ export const register: Register = on => {
           <Text dimColor>{now.folder}</Text>
           {now.branch !== '' && <Text color="suggestion">{` (${now.branch})`}</Text>}
           {now.changed > 0 && <Text color="warning">{` ±${now.changed}`}</Text>}
-          {/* TODO: confirm a branch with no upstream should read as needing a push - it also marks a repo that has no remote */}
-          {now.branch !== '' && (now.ahead > 0 || !now.isPublished) && (
+          {(now.ahead > 0 || now.isUnpublished) && (
             <Text color="success">{` ↑${now.ahead || ''}`}</Text>
           )}
-          {/* TODO: confirm counting against the last fetch is enough - nothing here runs git fetch, so new commits on origin show after the next fetch */}
           {now.behind > 0 && <Text color="error">{` ↓${now.behind}`}</Text>}
           {now.pull?.branch === now.branch && dot}
           {now.pull?.branch === now.branch && (

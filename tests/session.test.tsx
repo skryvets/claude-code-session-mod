@@ -19,7 +19,7 @@ const session = (
   rateLimits: SessionRateLimit[],
   tokens: () => number | undefined = () => 46100,
   categories?: ContextCategory[],
-  host: () => Record<string, string> = () => ({ git: '# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n' }),
+  host: (e: { argv: readonly string[]; init?: { env?: Record<string, string> } }) => Record<string, string> = () => ({ 'git status': '# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n' }),
 ) => {
   const estimate = (categories ?? []).reduce(
     (sum, { tokens, kind }) => (kind === 'used' ? sum + tokens : sum),
@@ -31,15 +31,19 @@ const session = (
   mock.store(on)
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
   on('session.model', () => ({ value: 'Opus 5.5' }))
-  on('process.run', (_, e) => ({
-    value: {
-      exitCode: e.argv[0]! in host() ? 0 : 1,
-      stdout: host()[e.argv[0]!] ?? '',
-      stderr: '',
-      isStdoutTruncated: false,
-      isStderrTruncated: false,
-    },
-  }))
+  on('process.run', (_, e) => {
+    const stdout = host(e)[e.argv.slice(0, 2).join(' ')]
+
+    return {
+      value: {
+        exitCode: stdout === undefined ? 1 : 0,
+        stdout: stdout ?? '',
+        stderr: '',
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
+    }
+  })
   on('session.usage', () => ({
     value: {
       startedAt: 0,
@@ -375,7 +379,13 @@ test('the branch is followed by changed files, commits to push and pull, and the
   const pr = (state: string) => JSON.stringify({ number: 12, state, headRefName: 'feature' })
   let host: Record<string, string> = {}
 
-  session(on, [], () => 46100, undefined, () => host)
+  const fetches: (Record<string, string> | undefined)[] = []
+
+  session(on, [], () => 46100, undefined, e => {
+    if (e.argv[1] === 'fetch') fetches.push(e.init?.env)
+
+    return host
+  })
   on('turn.complete', (_, e) => ({ text: e.answer }))
 
   const drawn = async () => {
@@ -393,14 +403,17 @@ test('the branch is followed by changed files, commits to push and pull, and the
 
   expect(await line()).toBe('Opus 5.5 · ~/Code/app')
 
-  host = { git: status('(detached)', ['1 .M N... 100644 100644 100644 abc abc a.ts']) }
+  host = { 'git remote': 'origin\n', 'git status': status('(detached)', ['1 .M N... 100644 100644 100644 abc abc a.ts']) }
   expect(await line()).toBe('Opus 5.5 · ~/Code/app ±1')
 
-  host = { git: status('feature', []) }
+  host = { 'git remote': 'origin\n', 'git status': status('feature', []) }
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ↑')
 
+  host = { 'git remote': '', 'git status': status('feature', []) }
+  expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature)')
+
   host = {
-    git: status('feature', [
+    'git remote': 'origin\n', 'git status': status('feature', [
       '# branch.upstream origin/feature',
       '# branch.ab +2 -3',
       '1 .M N... 100644 100644 100644 abc abc a.ts',
@@ -408,27 +421,48 @@ test('the branch is followed by changed files, commits to push and pull, and the
       'u UU N... 100644 100644 100644 100644 abc abc abc d.ts',
       '? e.ts',
     ]),
-    gh: pr('OPEN'),
+    'gh pr': pr('OPEN'),
   }
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ±4 ↑2 ↓3')
 
+  expect(fetches).toEqual([])
   await turn()
+  expect(fetches).toEqual([{ GIT_TERMINAL_PROMPT: '0' }])
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) ±4 ↑2 ↓3 · PR #12 open')
 
   const colors = Object.fromEntries((await drawn()).map(found => [found.text, found.props.color]))
 
   expect(colors).toMatchObject({ ' ±4': 'warning', ' ↑2': 'success', ' ↓3': 'error', 'PR #12 open': 'success' })
 
-  host = { git: status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']), gh: pr('MERGED') }
+  host = { 'git remote': 'origin\n', 'git status': status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']), 'gh pr': pr('MERGED') }
   await turn()
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature) · PR #12 merged')
   expect((await drawn()).find(found => found.text === 'PR #12 merged')!.props.color).toBe('merged')
 
-  host = { git: status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']), gh: pr('MERGED') }
+  host = { 'git remote': 'origin\n', 'git status': status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']), 'gh pr': pr('MERGED') }
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (other)')
 
-  host = { git: status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']) }
+  host = { 'git remote': 'origin\n', 'git status': status('other', ['# branch.upstream origin/other', '# branch.ab +0 -0']) }
   await turn()
-  host = { git: status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']) }
+  host = { 'git remote': 'origin\n', 'git status': status('feature', ['# branch.upstream origin/feature', '# branch.ab +0 -0']) }
   expect(await line()).toBe('Opus 5.5 · ~/Code/app (feature)')
+})
+
+test('commits fetched at the end of a turn are drawn without another measure', async ($, on) => {
+  let behind = 0
+
+  session(on, [], () => 46100, undefined, e => {
+    if (e.argv[1] === 'fetch') behind = 2
+
+    return {
+      'git remote': 'origin\n',
+      'git status': `# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -${behind}\n`,
+    }
+  })
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 'turn', reason: 'answer' })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+
+  expect((await ui.findAll({ type: 'Text' }))[0]!.text).toBe('Opus 5.5 · ~/Code/app (main) ↓2')
 })

@@ -22,8 +22,8 @@ Weekly:  ██████████░█░░░░░░░░░░░�
 ## How to read the git state
 
 - `±N` - files with uncommitted changes, untracked files included
-- `↑N` - commits not pushed to the upstream branch. A bare `↑` is a branch that has no upstream yet
-- `↓N` - commits on the upstream branch to pull, as of the last `git fetch`: the bar does not fetch
+- `↑N` - commits not pushed to the upstream branch. A bare `↑` is a branch that has no upstream yet, in a repo that has a remote
+- `↓N` - commits on the upstream branch to pull. The bar runs `git fetch` once a minute and at the end of each turn to keep this current. A remote that asks for a password is skipped
 - `PR #N open` / `merged` / `closed` - the pull request of the current branch, read with the [GitHub CLI](https://cli.github.com) once a minute and at the end of each turn. Nothing is shown without `gh`, or when the branch has no pull request
 
 ## Show and hide
