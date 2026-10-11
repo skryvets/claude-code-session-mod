@@ -13,6 +13,7 @@ export type SessionView = {
   window: number
   limits: SessionLimit[]
   now: number
+  isHidden: boolean
 }
 
 declare module 'claude-code' {

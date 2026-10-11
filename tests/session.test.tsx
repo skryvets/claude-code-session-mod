@@ -27,6 +27,7 @@ const session = (
 
   mock.clock(on, { now: Date.parse('2026-10-10T10:00:00Z') })
   mock.env(on, { HOME: '/Users/me' })
+  mock.store(on)
   on('session.cwd', () => ({ value: '/Users/me/Code/app' }))
   on('session.model', () => ({ value: 'Opus 5.5' }))
   on('process.run', () => ({
@@ -333,4 +334,36 @@ test('the band is drawn again after a /clear', async ($, on) => {
 
   expect(texts).toContain('Opus 5.5')
   expect(texts).toContain('46.1K')
+})
+
+test('/status-bar-mod hides the band and shows it again, across a /clear', async ($, on) => {
+  session(on, [])
+  on('classic.SessionStart', () => ({}))
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const drawn = async () => {
+    const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+    const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+
+    await ui.unmount()
+
+    return texts
+  }
+
+  const toggle = () =>
+    $.command.run({
+      command: 'status-bar-mod',
+      args: '',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: false, columns: 120 },
+    })
+
+  expect((await toggle()).text).toBe('Status bar hidden')
+  expect(await drawn()).toEqual(['band below'])
+
+  await $.classic.SessionStart({ source: 'clear' })
+  expect(await drawn()).toEqual(['band below'])
+
+  expect((await toggle()).text).toBe('Status bar shown')
+  expect((await drawn()).join('|')).toContain('Opus 5.5')
 })

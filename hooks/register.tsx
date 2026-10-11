@@ -23,6 +23,7 @@ const LABEL: Record<string, string> = {
 const PALETTE = ['#7aa2f7', '#7dcfff', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#73daca', '#c0caf5']
 const ELAPSED = '#999999'
 const MARK = '#333131'
+const COMMAND = 'status-bar-mod'
 const EMPTY: SessionView = {
   tokens: 0,
   percent: 0,
@@ -34,6 +35,7 @@ const EMPTY: SessionView = {
   window: 0,
   limits: [],
   now: 0,
+  isHidden: false,
 }
 const view = atom({ plugin: 'session', key: 'view' } as const, EMPTY)
 
@@ -147,13 +149,14 @@ const pace = (limit: SessionLimit, now: number) => {
 }
 
 const sync = async ($: EngineInterface, effort: string) => {
-  const [cwd, home, model, usage, now, git] = await Promise.all([
+  const [cwd, home, model, usage, now, git, hidden] = await Promise.all([
     $.session.cwd(),
     $.env.get('HOME'),
     $.session.model(),
     $.session.usage({ breakdown: 'summary' }),
     $.clock.now(),
     $.process.run(['git', 'branch', '--show-current']).catch(() => null),
+    $.store.get('hidden'),
   ])
   await update($, view, () => ({
     tokens: usage.context.tokens ?? usage.context.breakdown?.totalTokens ?? 0,
@@ -172,6 +175,7 @@ const sync = async ($: EngineInterface, effort: string) => {
       resetsAt ? { kind, percentUsed, resetsAt } : { kind, percentUsed },
     ),
     now,
+    isHidden: hidden === true,
   }))
 }
 
@@ -179,6 +183,7 @@ export const register: Register = on => {
   let effort = ''
 
   on('session.start', async ($, e, next) => {
+    await $.command.register({ name: COMMAND, description: 'Show or hide the status bar' })
     await sync($, effort)
     $.clock.every(60000, () => sync($, effort))
 
@@ -190,6 +195,15 @@ export const register: Register = on => {
     await sync($, effort).catch(() => {})
 
     return next(e)
+  })
+
+  on('command.run', { command: COMMAND }, async $ => {
+    const isHidden = (await $.store.get('hidden')) !== true
+
+    await $.store.set('hidden', isHidden)
+    await sync($, effort)
+
+    return { text: isHidden ? 'Status bar hidden' : 'Status bar shown' }
   })
 
   on('session.measure', async ($, e, next) => {
@@ -232,7 +246,7 @@ export const register: Register = on => {
     const rest = await next(e)
     const now = await read($, view)
 
-    if (e.props.hasSurvey || now.model === '') {
+    if (e.props.hasSurvey || now.model === '' || now.isHidden) {
       return rest
     }
 

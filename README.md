@@ -18,6 +18,10 @@ Weekly:  ██████████░█░░░░░░░░░░░�
 - Context window: one bar stacked by what fills it (messages, tools, MCP, memory, skills, system prompt), the free space and the autocompact buffer, then tokens used and percent
 - Session (5 hour) and Weekly (7 day) subscription limits: a bar of the time passed with a marker at the usage, percent used, pace, forecast and time until reset
 
+## Show and hide
+
+Type `/status-bar-mod` to hide the bar, and again to show it. The choice is kept between sessions
+
 ## How to read the pace
 
 - `on pace` - within 2 points of spending the limit evenly across the window
