@@ -112,18 +112,23 @@ const untilReset = (limit: SessionLimit, now: number) =>
   limit.resetsAt ? Date.parse(limit.resetsAt) - now : 0
 
 // Pace rules follow CodexBar's UsagePace.swift and UsagePaceText.swift, the marker its UsageProgressBar.swift (github.com/steipete/CodexBar)
-const pace = (limit: SessionLimit, now: number) => {
+const passed = (limit: SessionLimit, now: number) => {
   const span = SPAN[limit.kind]
   const remaining = untilReset(limit, now)
 
-  if (!span || remaining <= 0 || remaining > span) return null
+  return !span || remaining <= 0 || remaining > span ? null : ((span - remaining) / span) * 100
+}
 
-  const elapsed = span - remaining
-  const expected = (elapsed / span) * 100
+const pace = (limit: SessionLimit, now: number) => {
+  const expected = passed(limit, now)
+
+  if (expected === null) return null
+
+  const remaining = untilReset(limit, now)
+  const elapsed = SPAN[limit.kind]! - remaining
   const actual = Math.min(100, Math.max(0, limit.percentUsed))
-  const mark = Math.min(BAR - 1, Math.floor(((100 - expected) / 100) * BAR))
 
-  if (actual >= 100) return { verdict: 'limit reached', outlook: '', color: 'error', mark }
+  if (actual >= 100) return { verdict: 'limit reached', outlook: '', color: 'error' }
   if (expected < 3) return null
 
   const delta = actual - expected
@@ -136,7 +141,6 @@ const pace = (limit: SessionLimit, now: number) => {
         : `${Math.round(Math.abs(delta))}% in ${delta > 0 ? 'deficit' : 'reserve'}`,
     outlook: runsOutIn >= remaining ? 'lasts until reset' : `runs out in ${left(runsOutIn)}`,
     color: delta > 12 ? 'error' : delta > 2 ? 'warning' : 'success',
-    mark,
   }
 }
 
@@ -281,22 +285,22 @@ export const register: Register = on => {
 
           const at = pace(limit, now.now)
           const reset = untilReset(limit, now.now)
-          const filled = BAR - cells(limit.percentUsed)
+          const filled = Math.round(((passed(limit, now.now) ?? 0) / 100) * BAR)
+          const mark = Math.min(BAR - 1, Math.max(0, Math.round((limit.percentUsed / 100) * BAR)))
 
           return [
             <Text wrap="truncate-end">
               <Text bold>{`${name}:`.padEnd(9)}</Text>
               {Array.from({ length: BAR }, (_, i) =>
-                i === at?.mark ? (
-                  <Text color={at.color}>┃</Text>
+                i === mark ? (
+                  <Text color={at?.color}>┃</Text>
                 ) : i < filled ? (
                   <Text>█</Text>
                 ) : (
                   <Text color="inactive">░</Text>
                 ),
               )}
-              {/* TODO: confirm "left" is wanted over "used" - it matches what the bar now fills with */}
-              <Text>{` ${Math.round(100 - limit.percentUsed)}% left`}</Text>
+              <Text>{` ${Math.round(limit.percentUsed)}% used`}</Text>
               {at && dot}
               {at && <Text color={at.color}>{at.verdict}</Text>}
               {at && at.outlook !== '' && dot}

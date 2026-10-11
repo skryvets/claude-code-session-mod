@@ -92,11 +92,11 @@ test('context, model, folder and limit pace are drawn above the prompt', async (
       `${'█'.repeat(6)}${'░'.repeat(18)}`,
       '46.1K',
       '(23%)',
-      `Session: ${'█'.repeat(6)}┃█${'░'.repeat(16)} 34% left`,
+      `Session: ${'█'.repeat(16)}┃${'░'.repeat(7)} 66% used`,
       '7% in reserve',
       'lasts until reset',
       'resets in 1h 22m',
-      `Weekly:  ${'█'.repeat(10)}░░░┃${'░'.repeat(10)} 40% left`,
+      `Weekly:  ${'█'.repeat(10)}░░░░┃${'░'.repeat(9)} 60% used`,
       '17% in deficit',
       'runs out in 2d 0h',
       'resets in 4d 0h',
@@ -116,8 +116,7 @@ test('pace is held back until 3% of the window has passed', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text).join('|')
 
-  expect(texts).toContain(`${'█'.repeat(23)}░ 96% left`)
-  expect(texts).not.toContain('┃')
+  expect(texts).toContain(`Weekly:  ░┃${'░'.repeat(22)} 4% used`)
   expect(texts).toContain('resets in 6d 23h')
   expect(texts).not.toContain('pace')
   expect(texts).not.toContain('deficit')
@@ -272,7 +271,7 @@ test('a lone small category still fills one whole cell', async ($, on) => {
   expect(texts).toContain(`Context: █${'░'.repeat(23)} 500 (23%) · ■ system`)
 })
 
-test('a limit with any usage empties at least one cell', async ($, on) => {
+test('the fill follows the time passed, whatever the usage', async ($, on) => {
   session(on, [
     { kind: 'five_hour', percentUsed: 0, resetsAt: '2026-10-10T11:22:00Z' },
     { kind: 'seven_day', percentUsed: 1, resetsAt: '2026-10-14T10:00:00Z' },
@@ -282,8 +281,8 @@ test('a limit with any usage empties at least one cell', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts.some(text => text.startsWith(`Session: ${'█'.repeat(6)}┃${'█'.repeat(17)} 100% left`))).toBe(true)
-  expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(13)}┃${'█'.repeat(9)}░ 99% left`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Session: ┃${'█'.repeat(16)}${'░'.repeat(7)} 0% used`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Weekly:  ┃${'█'.repeat(9)}${'░'.repeat(14)} 1% used`))).toBe(true)
 })
 
 test('the bar is one neutral colour and only the marker carries the pace', async ($, on) => {
@@ -301,8 +300,8 @@ test('the bar is one neutral colour and only the marker carries the pace', async
       .map(found => found.props.color)
 
   expect(await colors('┃')).toEqual(['success', 'error'])
-  expect((await colors('█')).slice(-7)).toEqual(Array(7).fill(undefined))
-  expect(texts.some(text => text.startsWith(`Weekly:  ${'░'.repeat(13)}┃${'░'.repeat(10)} 0% left`))).toBe(true)
+  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill(undefined))
+  expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}┃ 100% used`))).toBe(true)
 })
 
 test('the band is left to a survey', async ($, on) => {

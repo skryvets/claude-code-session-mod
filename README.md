@@ -7,16 +7,16 @@ claude-opus-5-5 · high · ~/Code/app (main)
 
 Context: ███████░░░░░░░░░░░░░▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer
 
-Session: ██┃███░░░░░░░░░░░░░░░░░░ 27% left · 16% in reserve · lasts until reset · resets in 33m
+Session: ██████████████████┃██░░░ 73% used · 16% in reserve · lasts until reset · resets in 33m
 
-Weekly:  █████████████┃░░░░░░░░░░ 54% left · 3% in deficit · runs out in 3d 12h · resets in 4d 0h
+Weekly:  ██████████░┃░░░░░░░░░░░░ 46% used · 3% in deficit · runs out in 3d 12h · resets in 4d 0h
 ```
 
 ## What it shows
 
 - Model, effort level, folder and git branch
 - Context window: one bar stacked by what fills it (messages, tools, MCP, memory, skills, system prompt), the free space and the autocompact buffer, then tokens used and percent
-- Session (5 hour) and Weekly (7 day) subscription limits: a bar of what is left with a pace marker, percent left, pace, forecast and time until reset
+- Session (5 hour) and Weekly (7 day) subscription limits: a bar of the time passed with a marker at the usage, percent used, pace, forecast and time until reset
 
 ## How to read the pace
 
@@ -24,7 +24,7 @@ Weekly:  █████████████┃░░░░░░░░░�
 - `N% in reserve` - you have used less than even spending would
 - `N% in deficit` - you have used more than even spending would
 - `lasts until reset` / `runs out in …` - a straight-line forecast from your spending so far
-- `┃` on the bar - where the fill would end on even spending: fill past it is reserve, a gap before it is deficit
+- The bar fills with the time passed in the window, and `┃` marks how much of the limit is used: a marker inside the fill is reserve, at its edge is on pace, past it is deficit
 - No pace is shown until 3% of the window has passed (9 minutes for Session, about 5 hours for Weekly)
 
 The context bar has one colour per category, named by the legend after it. The filled part is true to size to the nearest cell, and each category takes its share of it to the nearest half cell: `▌` is a cell split between two categories, and a category too small for half a cell is named in the legend but not drawn. Messages are in the accent colour, `░` is free space and `▒` is the autocompact buffer, the reserve at the end of the window: auto-compaction runs when usage reaches it. The legend is the first thing cut on a narrow terminal
