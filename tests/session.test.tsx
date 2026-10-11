@@ -300,7 +300,7 @@ test('the fill takes the elapsed colour and the marker the pace colour', async (
       .map(found => found.props.color)
 
   expect(await colors('┃')).toEqual(['success', 'error'])
-  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#565f89'))
+  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#999999'))
   expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}┃ 100% used`))).toBe(true)
 })
 
