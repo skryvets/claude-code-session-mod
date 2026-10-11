@@ -92,13 +92,11 @@ test('context, model, folder and limit pace are drawn above the prompt', async (
       `${'█'.repeat(6)}${'░'.repeat(18)}`,
       '46.1K',
       '(23%)',
-      'Session: ',
-      '66% used',
+      `Session: ${'█'.repeat(6)}┃█${'░'.repeat(16)} 34% left`,
       '7% in reserve',
       'lasts until reset',
       'resets in 1h 22m',
-      'Weekly:  ',
-      '60% used',
+      `Weekly:  ${'█'.repeat(10)}░░░┃${'░'.repeat(10)} 40% left`,
       '17% in deficit',
       'runs out in 2d 0h',
       'resets in 4d 0h',
@@ -118,7 +116,8 @@ test('pace is held back until 3% of the window has passed', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text).join('|')
 
-  expect(texts).toContain('4% used')
+  expect(texts).toContain(`${'█'.repeat(23)}░ 96% left`)
+  expect(texts).not.toContain('┃')
   expect(texts).toContain('resets in 6d 23h')
   expect(texts).not.toContain('pace')
   expect(texts).not.toContain('deficit')
@@ -273,7 +272,7 @@ test('a lone small category still fills one whole cell', async ($, on) => {
   expect(texts).toContain(`Context: █${'░'.repeat(23)} 500 (23%) · ■ system`)
 })
 
-test('a limit with any usage fills at least one cell', async ($, on) => {
+test('a limit with any usage empties at least one cell', async ($, on) => {
   session(on, [
     { kind: 'five_hour', percentUsed: 0, resetsAt: '2026-10-10T11:22:00Z' },
     { kind: 'seven_day', percentUsed: 1, resetsAt: '2026-10-14T10:00:00Z' },
@@ -283,8 +282,27 @@ test('a limit with any usage fills at least one cell', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts.some(text => text.startsWith(`Session: ${'░'.repeat(24)} 0% used`))).toBe(true)
-  expect(texts.some(text => text.startsWith(`Weekly:  █${'░'.repeat(23)} 1% used`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Session: ${'█'.repeat(6)}┃${'█'.repeat(17)} 100% left`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(13)}┃${'█'.repeat(9)}░ 99% left`))).toBe(true)
+})
+
+test('the bar is one neutral colour and only the marker carries the pace', async ($, on) => {
+  session(on, [
+    { kind: 'five_hour', percentUsed: 66, resetsAt: '2026-10-10T11:22:00Z' },
+    { kind: 'seven_day', percentUsed: 100, resetsAt: '2026-10-14T10:00:00Z' },
+  ])
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+  const colors = async (glyph: string) =>
+    (await ui.findAll({ type: 'Text', text: glyph }))
+      .filter(found => found.text === glyph)
+      .map(found => found.props.color)
+
+  expect(await colors('┃')).toEqual(['success', 'error'])
+  expect((await colors('█')).slice(-7)).toEqual(Array(7).fill(undefined))
+  expect(texts.some(text => text.startsWith(`Weekly:  ${'░'.repeat(13)}┃${'░'.repeat(10)} 0% left`))).toBe(true)
 })
 
 test('the band is left to a survey', async ($, on) => {
