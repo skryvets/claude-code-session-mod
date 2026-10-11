@@ -21,8 +21,7 @@ const LABEL: Record<string, string> = {
 }
 // Palette follows context-bar by Hamza Zafar (github.com/hamzafer/claude-code-mods): /context's theme gives several rows the same grey
 const PALETTE = ['#7aa2f7', '#7dcfff', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#73daca', '#c0caf5']
-const USED = '#7dcfff'
-const TICK = '#f7768e'
+const ELAPSED = '#7dcfff'
 const EMPTY: SessionView = {
   tokens: 0,
   percent: 0,
@@ -287,19 +286,17 @@ export const register: Register = on => {
 
           const at = pace(limit, now.now)
           const reset = untilReset(limit, now.now)
-          const expected = passed(limit, now.now)
-          const filled = Math.round((Math.min(100, Math.max(0, limit.percentUsed)) / 100) * BAR)
-          const mark =
-            expected === null ? -1 : Math.min(BAR - 1, Math.max(0, Math.round((expected / 100) * BAR)))
+          const filled = Math.round(((passed(limit, now.now) ?? 0) / 100) * BAR)
+          const mark = Math.min(BAR - 1, Math.max(0, Math.round((limit.percentUsed / 100) * BAR)))
 
           return [
             <Text wrap="truncate-end">
               <Text bold>{`${name}:`.padEnd(9)}</Text>
               {Array.from({ length: BAR }, (_, i) =>
                 i === mark ? (
-                  <Text color={TICK}>┃</Text>
+                  <Text color={at?.color}>┃</Text>
                 ) : i < filled ? (
-                  <Text color={USED}>█</Text>
+                  <Text color={ELAPSED}>█</Text>
                 ) : (
                   <Text color="inactive">░</Text>
                 ),

@@ -16,7 +16,7 @@ Weekly:  ██████████░┃░░░░░░░░░░░�
 
 - Model, effort level, folder and git branch
 - Context window: one bar stacked by what fills it (messages, tools, MCP, memory, skills, system prompt), the free space and the autocompact buffer, then tokens used and percent
-- Session (5 hour) and Weekly (7 day) subscription limits: a bar of the usage with a marker at the time passed, percent used, pace, forecast and time until reset
+- Session (5 hour) and Weekly (7 day) subscription limits: a bar of the time passed with a marker at the usage, percent used, pace, forecast and time until reset
 
 ## How to read the pace
 
@@ -24,12 +24,12 @@ Weekly:  ██████████░┃░░░░░░░░░░░�
 - `N% in reserve` - you have used less than even spending would
 - `N% in deficit` - you have used more than even spending would
 - `lasts until reset` / `runs out in …` - a straight-line forecast from your spending so far
-- The bar fills with the share of the limit used, and `┃` marks how much of the window has passed: a fill short of the marker is reserve, at the marker is on pace, past it is deficit
+- The bar fills with the time passed in the window, and `┃` marks how much of the limit is used: a marker inside the fill is reserve, at its edge is on pace, past it is deficit
 - No pace is shown until 3% of the window has passed (9 minutes for Session, about 5 hours for Weekly)
 
 The context bar has one colour per category, named by the legend after it. The filled part is true to size to the nearest cell, and each category takes its share of it to the nearest half cell: `▌` is a cell split between two categories, and a category too small for half a cell is named in the legend but not drawn. Messages are in the accent colour, `░` is free space and `▒` is the autocompact buffer, the reserve at the end of the window: auto-compaction runs when usage reaches it. The legend is the first thing cut on a narrow terminal
 
-The context token count is green, then yellow at 70% and red at 90%. Limit bars are filled in cyan with a red marker. The pace text is green, yellow in deficit and red past 12 points of deficit
+The context token count is green, then yellow at 70% and red at 90%. Limit bars are filled in cyan, with the marker in the pace colour. The pace text is green, yellow in deficit and red past 12 points of deficit
 
 ## Install
 
