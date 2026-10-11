@@ -111,15 +111,21 @@ const stack = (slices: SessionSlice[], window: number) => {
 const untilReset = (limit: SessionLimit, now: number) =>
   limit.resetsAt ? Date.parse(limit.resetsAt) - now : 0
 
-// Pace rules follow CodexBar's UsagePace.swift and UsagePaceText.swift (github.com/steipete/CodexBar)
-const pace = (limit: SessionLimit, now: number) => {
+// Pace rules follow CodexBar's UsagePace.swift and UsagePaceText.swift, the marker its UsageProgressBar.swift (github.com/steipete/CodexBar)
+const passed = (limit: SessionLimit, now: number) => {
   const span = SPAN[limit.kind]
   const remaining = untilReset(limit, now)
 
-  if (!span || remaining <= 0 || remaining > span) return null
+  return !span || remaining <= 0 || remaining > span ? null : ((span - remaining) / span) * 100
+}
 
-  const elapsed = span - remaining
-  const expected = (elapsed / span) * 100
+const pace = (limit: SessionLimit, now: number) => {
+  const expected = passed(limit, now)
+
+  if (expected === null) return null
+
+  const remaining = untilReset(limit, now)
+  const elapsed = SPAN[limit.kind]! - remaining
   const actual = Math.min(100, Math.max(0, limit.percentUsed))
 
   if (actual >= 100) return { verdict: 'limit reached', outlook: '', color: 'error' }
@@ -279,10 +285,21 @@ export const register: Register = on => {
 
           const at = pace(limit, now.now)
           const reset = untilReset(limit, now.now)
+          const filled = Math.round(((passed(limit, now.now) ?? 0) / 100) * BAR)
+          const mark = Math.min(BAR - 1, Math.max(0, Math.round((limit.percentUsed / 100) * BAR)))
 
           return [
             <Text wrap="truncate-end">
-              {row(name, limit.percentUsed, at?.color ?? heat(limit.percentUsed))}
+              <Text bold>{`${name}:`.padEnd(9)}</Text>
+              {Array.from({ length: BAR }, (_, i) =>
+                i === mark ? (
+                  <Text>┃</Text>
+                ) : i < filled ? (
+                  <Text color="inactive">█</Text>
+                ) : (
+                  <Text color="inactive">░</Text>
+                ),
+              )}
               <Text>{` ${Math.round(limit.percentUsed)}% used`}</Text>
               {at && dot}
               {at && <Text color={at.color}>{at.verdict}</Text>}
