@@ -1,6 +1,6 @@
 {
   "name": "session",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Coloured session lines above the prompt: model, effort, folder, context usage, and rate limit bars with pace",
   "author": { "name": "Sergey Kryvets" },
   "types": "./types/index.d.ts"

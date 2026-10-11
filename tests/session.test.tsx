@@ -92,11 +92,11 @@ test('context, model, folder and limit pace are drawn above the prompt', async (
       `${'█'.repeat(6)}${'░'.repeat(18)}`,
       '46.1K',
       '(23%)',
-      `Session: ${'█'.repeat(16)}┃${'░'.repeat(7)} 66% used`,
+      `Session: ${'█'.repeat(16)}█${'░'.repeat(7)} 66% used`,
       '7% in reserve',
       'lasts until reset',
       'resets in 1h 22m',
-      `Weekly:  ${'█'.repeat(10)}░░░░┃${'░'.repeat(9)} 60% used`,
+      `Weekly:  ${'█'.repeat(10)}░░░░█${'░'.repeat(9)} 60% used`,
       '17% in deficit',
       'runs out in 2d 0h',
       'resets in 4d 0h',
@@ -116,7 +116,7 @@ test('pace is held back until 3% of the window has passed', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text).join('|')
 
-  expect(texts).toContain(`Weekly:  ░┃${'░'.repeat(22)} 4% used`)
+  expect(texts).toContain(`Weekly:  ░█${'░'.repeat(22)} 4% used`)
   expect(texts).toContain('resets in 6d 23h')
   expect(texts).not.toContain('pace')
   expect(texts).not.toContain('deficit')
@@ -281,8 +281,8 @@ test('the fill follows the time passed, whatever the usage', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'session', surface: 'terminal', ...BAND })
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
-  expect(texts.some(text => text.startsWith(`Session: ┃${'█'.repeat(16)}${'░'.repeat(7)} 0% used`))).toBe(true)
-  expect(texts.some(text => text.startsWith(`Weekly:  ┃${'█'.repeat(9)}${'░'.repeat(14)} 1% used`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Session: █${'█'.repeat(16)}${'░'.repeat(7)} 0% used`))).toBe(true)
+  expect(texts.some(text => text.startsWith(`Weekly:  █${'█'.repeat(9)}${'░'.repeat(14)} 1% used`))).toBe(true)
 })
 
 test('the fill takes the elapsed colour and the marker its own', async ($, on) => {
@@ -299,9 +299,13 @@ test('the fill takes the elapsed colour and the marker its own', async ($, on) =
       .filter(found => found.text === glyph)
       .map(found => found.props.color)
 
-  expect(await colors('┃')).toEqual(['#333131', '#333131'])
-  expect((await colors('█')).slice(-26)).toEqual(Array(26).fill('#999999'))
-  expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}┃ 100% used`))).toBe(true)
+  expect((await colors('█')).slice(-28)).toEqual([
+    ...Array(16).fill('#999999'),
+    '#333131',
+    ...Array(10).fill('#999999'),
+    '#333131',
+  ])
+  expect(texts.some(text => text.startsWith(`Weekly:  ${'█'.repeat(10)}${'░'.repeat(13)}█ 100% used`))).toBe(true)
 })
 
 test('the band is left to a survey', async ($, on) => {

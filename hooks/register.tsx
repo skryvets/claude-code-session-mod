@@ -295,7 +295,7 @@ export const register: Register = on => {
               <Text bold>{`${name}:`.padEnd(9)}</Text>
               {Array.from({ length: BAR }, (_, i) =>
                 i === mark ? (
-                  <Text color={MARK}>┃</Text>
+                  <Text color={MARK}>█</Text>
                 ) : i < filled ? (
                   <Text color={ELAPSED}>█</Text>
                 ) : (
