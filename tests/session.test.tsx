@@ -177,7 +177,7 @@ test('context is drawn as one bar stacked by what fills the window', async ($, o
   expect(texts).toContain(`Context: ▌█▌███${'░'.repeat(14)}▒▒▒▒ 46.1K (23%) · ■ msgs  ■ tools  ■ system  ▒ buffer`)
   const halves = (await ui.findAll({ type: 'Text', text: '▌' })).filter(found => found.text === '▌')
 
-  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#565f89', 'claude'])
+  expect(halves.map(found => found.props.backgroundColor)).toEqual(['#7dcfff', 'claude'])
   expect(texts.join('|')).not.toContain('deferred')
   expect(texts.join('|')).not.toContain('skills')
 })
